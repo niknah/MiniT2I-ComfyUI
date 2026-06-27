@@ -1,0 +1,20 @@
+[project]
+name = "MiniT2I-ComfyUI"
+version = "1.0.0"
+description = "MiniT2i for ComfyUI"
+license = { file = "LICENSE" }
+dependencies = [
+]
+classifiers = [
+    "Operating System :: OS Independent"  # Works on all operating systems
+]
+dynamic = ["dependencies"]
+
+[project.urls]
+Repository = "https://github.com/niknah/MiniT2I-ComfyUI"
+Documentation = "https://huggingface.co/MiniT2I/MiniT2I"
+"Bug Tracker" = "https://github.com/niknah/MiniT2I-ComfyUI/issues"
+
+[tool.comfy]
+PublisherId = "niknah"
+DisplayName = "MiniT2I"
