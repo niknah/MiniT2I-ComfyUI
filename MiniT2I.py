@@ -5,6 +5,7 @@ from comfy_api.latest import io
 from PIL import Image
 import torch
 from diffusers import DiffusionPipeline
+from .pipeline import MiniT2IPipeline
 # import os
 
 model_downloaded = False
@@ -89,33 +90,33 @@ class MiniT2ISampler(io.ComfyNode):
 #            return []
 
 
-    @classmethod
-    def pil2tensor(cls, image: Union[Image.Image, List[Image.Image]]) -> torch.Tensor:
-        """
-        Convert PIL image(s) to tensor, matching ComfyUI's implementation.
-
-        Args:
-            image: Single PIL Image or list of PIL Images
-
-        Returns:
-            torch.Tensor: Image tensor with values normalized to [0, 1]
-        """
-        if isinstance(image, list):
-            if len(image) == 0:
-                return torch.empty(0)
-            return torch.cat([cls.pil2tensor(img) for img in image], dim=0)
-
-        # Convert PIL image to RGB if needed
-        if image.mode == 'RGBA':
-            image = image.convert('RGB')
-        elif image.mode != 'RGB':
-            image = image.convert('RGB')
-
-        # Convert to numpy array and normalize to [0, 1]
-        img_array = np.array(image).astype(np.float32) / 255.0
-
-        # Return tensor with shape [1, H, W, 3]
-        return torch.from_numpy(img_array)[None,]
+#    @classmethod
+#    def pil2tensor(cls, image: Union[Image.Image, List[Image.Image]]) -> torch.Tensor:
+#        """
+#        Convert PIL image(s) to tensor, matching ComfyUI's implementation.
+#
+#        Args:
+#            image: Single PIL Image or list of PIL Images
+#
+#        Returns:
+#            torch.Tensor: Image tensor with values normalized to [0, 1]
+#        """
+#        if isinstance(image, list):
+#            if len(image) == 0:
+#                return torch.empty(0)
+#            return torch.cat([cls.pil2tensor(img) for img in image], dim=0)
+#
+#        # Convert PIL image to RGB if needed
+#        if image.mode == 'RGBA':
+#            image = image.convert('RGB')
+#        elif image.mode != 'RGB':
+#            image = image.convert('RGB')
+#
+#        # Convert to numpy array and normalize to [0, 1]
+#        img_array = np.array(image).astype(np.float32) / 255.0
+#
+#        # Return tensor with shape [1, H, W, 3]
+#        return torch.from_numpy(img_array)[None,]
 
     @classmethod
     def execute(cls, prompt, steps, guidance, model_type, seed) -> io.NodeOutput:
@@ -128,11 +129,12 @@ class MiniT2ISampler(io.ComfyNode):
         
 
         HUB_MODEL_ID = "MiniT2I/MiniT2I"
-        pipe = DiffusionPipeline.from_pretrained(
+        pipe = MiniT2IPipeline.from_pretrained(
+#        pipe = DiffusionPipeline.from_pretrained(
             HUB_MODEL_ID,
-            custom_pipeline=str(script_dir / "pipeline.py"),
+#            custom_pipeline=str(script_dir / "pipeline.py"),
             local_files_only=model_downloaded,
-            trust_remote_code=True,
+#            trust_remote_code=True,
         )
         if pipe:
             model_downloaded = True
