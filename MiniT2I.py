@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Union
 import numpy as np
 from comfy_api.latest import io
@@ -121,10 +122,15 @@ class MiniT2ISampler(io.ComfyNode):
         global model_downloaded
         torch.manual_seed(seed)
 
+
+# Gets the absolute directory of the running script
+        script_dir = Path(__file__).resolve().parent
+        
+
         HUB_MODEL_ID = "MiniT2I/MiniT2I"
         pipe = DiffusionPipeline.from_pretrained(
             HUB_MODEL_ID,
-            custom_pipeline=HUB_MODEL_ID,
+            custom_pipeline=str(script_dir / "pipeline.py"),
             local_files_only=model_downloaded,
             trust_remote_code=True,
         )
@@ -137,10 +143,11 @@ class MiniT2ISampler(io.ComfyNode):
             guidance_scale=guidance,
             num_inference_steps=steps,
             torch_dtype=torch.bfloat16,
+            local_files_only=model_downloaded,
+            output_type="pt",
         )
-
-        return io.NodeOutput(cls.pil2tensor(output.images))
-#        return io.NodeOutput(image)
+ 
+        return io.NodeOutput(output.images,)
 
     """
         The node will always be re executed if any of the inputs change but
