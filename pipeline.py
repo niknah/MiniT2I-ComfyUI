@@ -611,7 +611,6 @@ class MiniT2ITextToImagePipeline(nn.Module):
         finally:
             self.transformer.model.cfg.n_T = old_steps
 
-
         if output_type == "pt":
             images = (images.clamp(-1, 1) * 0.5 + 0.5).permute(0, 2, 3, 1).to(torch.float16).cpu()
             pass
@@ -679,11 +678,27 @@ class MiniT2IPipeline(DiffusionPipeline):
             )
         )
 
+    @classmethod
+    def load_transformer(cls,
+        model_type: str = "b16",
+        repo_id_or_path: Union[str, os.PathLike] = "MiniT2I/MiniT2I",
+        revision: Optional[str] = None,
+        local_files_only: bool = False,
+        torch_dtype: Optional[torch.dtype] = torch.bfloat16,
+        cache_dir: Optional[Union[str, os.PathLike]] = None,
+    ):
+        model_dir = cls._resolve_model_type(model_type)
+        root = cls._resolve_root(repo_id_or_path, model_dir, revision, cache_dir, local_files_only)
+        model_root = root / model_dir
+        return MiniT2IMMJiTModel.from_pretrained(model_root / "transformer", torch_dtype=torch_dtype)
+
     @torch.no_grad()
     def __call__(
         self,
         prompt: Union[str, List[str]],
-        model_type: str = "b16",
+        transformer, text_encoder,
+        #model_type: str = "b16",
+        model_dir: Path,
         repo_id_or_path: Union[str, os.PathLike] = "MiniT2I/MiniT2I",
         torch_dtype: Optional[torch.dtype] = torch.bfloat16,
         text_encoder_dtype: torch.dtype = torch.float32,
@@ -693,18 +708,22 @@ class MiniT2IPipeline(DiffusionPipeline):
         cache_dir: Optional[Union[str, os.PathLike]] = None,
         **kwargs,
     ):
-        model_dir = self._resolve_model_type(model_type)
+        if model_dir is None:
+            model_dir = self._resolve_model_type("b16")
         root = self._resolve_root(repo_id_or_path, model_dir, revision, cache_dir, local_files_only)
         model_root = root / model_dir
-        transformer = MiniT2IMMJiTModel.from_pretrained(model_root / "transformer", torch_dtype=torch_dtype)
+        if transformer is None:
+            transformer = MiniT2IMMJiTModel.from_pretrained(model_root / "transformer", torch_dtype=torch_dtype)
         scheduler = MiniT2IFlowMatchScheduler.from_pretrained(model_root / "scheduler")
         text_encoder_name = transformer.mmjit_config.llm
         tokenizer = AutoTokenizer.from_pretrained(text_encoder_name, local_files_only=local_files_only)
-        text_encoder = T5EncoderModel.from_pretrained(
-            text_encoder_name,
-            torch_dtype=text_encoder_dtype,
-            local_files_only=local_files_only,
-        )
+
+        if text_encoder is None:
+            text_encoder = T5EncoderModel.from_pretrained(
+                text_encoder_name,
+                torch_dtype=text_encoder_dtype,
+                local_files_only=local_files_only,
+            )
         pipe = MiniT2ITextToImagePipeline(
             transformer=transformer,
             scheduler=scheduler,

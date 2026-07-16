@@ -1,14 +1,65 @@
-from pathlib import Path
-from typing import List, Union
-import numpy as np
 from comfy_api.latest import io
-from PIL import Image
 import torch
-from diffusers import DiffusionPipeline
 from .pipeline import MiniT2IPipeline
-# import os
+from comfy.model_patcher import ModelPatcher
+import comfy.model_management as mm
+from transformers import T5EncoderModel # AutoTokenizer, 
+
 
 model_downloaded = False
+
+
+class MiniT2ITextEncoder(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="MiniT2ITextEncoder",
+            display_name="MiniT2I Text Encoder Loader",
+            category="MiniT2I",
+            inputs=[
+            ],
+            outputs=[
+                io.Model.Output(),
+            ],
+        )
+
+    @classmethod
+    def execute(cls) -> io.NodeOutput:
+        load_device = mm.get_torch_device()
+        offload_device = mm.intermediate_device()
+
+        text_encoder = T5EncoderModel.from_pretrained(
+             "google/flan-t5-large",
+             torch_dtype=torch.float32,
+             local_files_only=model_downloaded,
+         )
+
+        return io.NodeOutput(ModelPatcher(text_encoder, load_device, offload_device),)
+
+
+class MiniT2ILoader(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="MiniT2ILoader",
+            display_name="MiniT2I Model Loader",
+            category="MiniT2I",
+            inputs=[
+                io.Combo.Input("model_type", options=["b16","l16"], tooltip="l16=large, b16=normal"),
+            ],
+            outputs=[
+                io.Model.Output(),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, model_type) -> io.NodeOutput:
+        transformer = MiniT2IPipeline.load_transformer(model_type)
+        load_device = mm.get_torch_device()
+        offload_device = mm.intermediate_device()
+
+        return io.NodeOutput(ModelPatcher(transformer, load_device, offload_device),)
+
 
 class MiniT2ISampler(io.ComfyNode):
     """
@@ -58,7 +109,8 @@ class MiniT2ISampler(io.ComfyNode):
                     display_mode=io.NumberDisplay.number,
                     lazy=True,
                 ),
-                io.Combo.Input("model_type", options=["b16","l16"]),
+                io.Model.Input("model", tooltip="Use MiniT2I Loader", optional=True),
+                io.Model.Input("text_encoder", tooltip="Use MiniT2I Text Encoder Loader", optional=True),
                 io.Int.Input(
                     "seed",
                     default=1,
@@ -90,43 +142,14 @@ class MiniT2ISampler(io.ComfyNode):
 #            return []
 
 
-#    @classmethod
-#    def pil2tensor(cls, image: Union[Image.Image, List[Image.Image]]) -> torch.Tensor:
-#        """
-#        Convert PIL image(s) to tensor, matching ComfyUI's implementation.
-#
-#        Args:
-#            image: Single PIL Image or list of PIL Images
-#
-#        Returns:
-#            torch.Tensor: Image tensor with values normalized to [0, 1]
-#        """
-#        if isinstance(image, list):
-#            if len(image) == 0:
-#                return torch.empty(0)
-#            return torch.cat([cls.pil2tensor(img) for img in image], dim=0)
-#
-#        # Convert PIL image to RGB if needed
-#        if image.mode == 'RGBA':
-#            image = image.convert('RGB')
-#        elif image.mode != 'RGB':
-#            image = image.convert('RGB')
-#
-#        # Convert to numpy array and normalize to [0, 1]
-#        img_array = np.array(image).astype(np.float32) / 255.0
-#
-#        # Return tensor with shape [1, H, W, 3]
-#        return torch.from_numpy(img_array)[None,]
 
     @classmethod
-    def execute(cls, prompt, steps, guidance, model_type, seed) -> io.NodeOutput:
+    def execute(cls, prompt, steps, guidance, model, text_encoder, seed) -> io.NodeOutput:
         global model_downloaded
         torch.manual_seed(seed)
 
+        # transformer = model
 
-# Gets the absolute directory of the running script
-        script_dir = Path(__file__).resolve().parent
-        
 
         HUB_MODEL_ID = "MiniT2I/MiniT2I"
         pipe = MiniT2IPipeline.from_pretrained(
@@ -141,7 +164,9 @@ class MiniT2ISampler(io.ComfyNode):
 
         output = pipe(
             prompt,
-            model_type=model_type,
+            model.model, text_encoder.model,
+#            model_type=model_type,
+            model_dir=model.model.config._name_or_path.parent if model else None,
             guidance_scale=guidance,
             num_inference_steps=steps,
             torch_dtype=torch.bfloat16,
