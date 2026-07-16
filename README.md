@@ -12,3 +12,7 @@ Workflows are in the templates section.
 
 
 Just a quickie.  Bit slow cause the model is not cached in memory.
+
+### Changes
+
+* v1.0.2: Split up into loader & inference nodes so ComfyUI handles VRAM, quicker.

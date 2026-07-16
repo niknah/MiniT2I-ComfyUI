@@ -1,6 +1,6 @@
 [project]
 name = "MiniT2I-ComfyUI"
-version = "1.0.1"
+version = "1.0.2"
 description = "MiniT2i for ComfyUI"
 license = { file = "LICENSE" }
 dependencies = [
